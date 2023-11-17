@@ -32,6 +32,7 @@ from hashlib import sha256
 
 from json import dumps
 
+from network import send_ping
 from network import update_peers
 
 from requests import post
@@ -106,9 +107,18 @@ def get_block_reward():
 
 @app.route('/discover/nodes', methods=['GET'])
 def discover_nodes_get():
-    peer_dict_keys = ('version', 'services', 'ipv4_address', 'port', 'node_id')
-
+    peer_dict_keys = ('version', 'services', 'ipv4_address', 'port', 'node_id', 'status')
+    
     peers_db_data_json = read_db_json(get_cursor('peers.db'), 'peers_set', '*', 'services')
+
+    up_peers = []
+
+    for peer in peers_db_data_json:
+        if send_ping(peer['ipv4_address'], peer['port']):
+            update_db(get_cursor('peers.db'), 'peers_set', 'node_id', (peer['version'], dumps(peer['services']), peer['ipv4_address'], peer['port'], peer['node_id'], 1), peer['node_id'])
+            up_peers.append(peer)
+        else:
+            update_db(get_cursor('peers.db'), 'peers_set', 'node_id', (peer['version'], dumps(peer['services']), peer['ipv4_address'], peer['port'], peer['node_id'], 0), peer['node_id'])
 
     json_file_data = read_json_file('config.json')
 
@@ -119,7 +129,7 @@ def discover_nodes_get():
 
     json_nodes = [{key : value for key, value in zip(peer_dict_keys, (version, services, get_private_ipv4_address(), port, node_id, 1))}]
 
-    json_nodes += peers_db_data_json
+    json_nodes += up_peers
 
     return jsonify(json_nodes)
 
@@ -249,7 +259,7 @@ def validate_tx():
         tx_valid = {'tx_valid' : True}
     
     return jsonify(tx_valid)
-    
+
 @app.route('/validate/block', methods=['POST'])
 def validate_block():
     global mempool
@@ -257,7 +267,7 @@ def validate_block():
 
     block = request.json
 
-    prev_hash = get_col_last_value(get_cursor('blockchain.db'), 'header', 'hash')
+    prev_hash = get_col_last_value(get_cursor('blockchain.db'), 'header ORDER BY height', 'hash')
 
     block_valid = {'block_valid' : False}
 
@@ -285,7 +295,7 @@ def validate_block():
             
             write_db(get_cursor('blockchain.db'), 'header', get_column_names_db(get_cursor('blockchain.db'), 'header'), block_header_data)
 
-            new_mempool = []       
+            new_mempool = []
 
             for tx in block['txs']:
                 tx_params = (list(tx.values()) + [block_hash, block_height])[1:]
@@ -300,9 +310,17 @@ def validate_block():
                         del_db(get_cursor('utxos.db'), 'utxos_set WHERE txid = ? AND output_index = ?', (inp['txid'], inp['output_index']))
 
                 write_db(get_cursor('utxos.db'), 'utxos_set', utxos_cols, (tx['txid'], 0, tx['outputs'][0]['amount'], tx['outputs'][0]['address']))
+                utxo_1 = {'txid' : tx['txid'], 'output_index' : 0, 'amount' : tx['outputs'][0]['amount'], 'address' : tx['outputs'][0]['address']}
+
+                if utxo_1 in utxos_mempool:
+                    utxos_mempool.remove(utxo_1)
 
                 if len(tx['outputs']) > 1:
                     write_db(get_cursor('utxos.db'), 'utxos_set', utxos_cols, (tx['txid'], 1, tx['outputs'][1]['amount'], tx['outputs'][1]['address']))
+                    utxo_2 = {'txid' : tx['txid'], 'output_index' : 1, 'amount' : tx['outputs'][1]['amount'], 'address' : tx['outputs'][1]['address']}
+
+                    if utxo_2 in utxos_mempool:
+                        utxos_mempool.remove(utxo_2)
 
                 write_db(get_cursor('blockchain.db'), 'txs', blockchain_txs_cols, tx_params)
             

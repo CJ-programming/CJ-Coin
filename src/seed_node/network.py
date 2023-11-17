@@ -7,15 +7,19 @@ from global_vars import version
 from json import dumps
 
 from requests import get
+from requests.exceptions import ConnectionError
 
 from utils import get_private_ipv4_address
 from utils import read_json_file
 
 def send_ping(ipv4_address, port):
     try:
-        response = get(f'http://{ipv4_address}:{port}/ping').json()
+        response = get(f'http://{ipv4_address}:{port}/ping', timeout=10)
+        response.raise_for_status()
 
-        if response == 'pong':
+        data = response.json()
+
+        if data == 'pong':
             return True
         
     except ConnectionError:

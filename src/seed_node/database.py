@@ -133,6 +133,13 @@ def write_db(cursor : Cursor, table : str, cols : tuple, values : tuple) -> Curs
     cursor.execute(query, values)
 
     cursor.connection.commit()
+
+def write_db_json(cursor : Cursor, table : str, json_data) -> Cursor:
+    query = f"INSERT INTO {table} ({', '.join(json_data.keys())}) VALUES ({', '.join('?' * len(json_data))})"
+
+    cursor.execute(query, tuple(json_data.values()))
+
+    cursor.connection.commit()
     
 def get_column_names_db(cursor : Cursor, table : str):
     columns = cursor.execute(f"PRAGMA table_info({table})").fetchall()

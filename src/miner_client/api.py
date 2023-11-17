@@ -243,12 +243,14 @@ if __name__ == '__main__':
             break
             
         print('Incorrect password, please try again')
+    
+    create_private_key(key)
 
     private_key = SigningKey.from_string(decrypt_file('private_key.bin', key), SECP256k1)
 
-    public_key = compress_verifying_key(private_key.get_verifying_key())
+    verifying_key = compress_verifying_key(private_key.get_verifying_key())
 
-    own_address = double_sha256(public_key).hex()
+    own_address = double_sha256(verifying_key).hex()
 
     print('own_address:', own_address)
 

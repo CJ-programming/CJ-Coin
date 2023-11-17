@@ -125,6 +125,7 @@ def get_cursor(db : str) -> Cursor:
     
     return cursor
 
+
 def write_db(cursor : Cursor, table : str, cols : tuple, values : tuple) -> Cursor:
     query = f"INSERT INTO {table} ({','.join(cols)}) VALUES ({','.join('?' * len(values))})"
 
