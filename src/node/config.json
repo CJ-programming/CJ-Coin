@@ -1,1 +1,0 @@
-{"services": {"node_network": true, "node_getutxo": true, "node_bloom": true, "node_compact_filters": true, "node_network_limited": false}, "port": 8233}
